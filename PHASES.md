@@ -80,15 +80,81 @@ monkeypatched subprocess calls — no real device or network required.
 (`python -m pen_andro --help`) to confirm the package actually installs and
 runs before calling the rewrite done.
 
-## Explicitly out of scope
+## Round 2 — requested as "everything", scoped down by two items
 
-Raised during planning and deliberately not built, so nobody wonders why
-they're missing:
-- **iOS support** — this tool's entire model (root/ADB/Magisk/Frida-on-Android)
-  doesn't transfer; it would be a separate project, not a feature flag here.
-- **Cloud/remote device farms** — no device-farm integration was requested
-  and it changes the trust/network model significantly; left for a future,
-  explicitly-scoped effort.
-- **Web dashboard** — the Tkinter GUI covers the "not a terminal menu" need
-  without adding a server/browser attack surface for a tool that already
-  requires local root/USB access.
+After the Phase 1–7 rewrite merged, a follow-up request asked for
+literally everything on the original candidate list, including the two
+items Phase 1–7 had declined. Declining stood for one of them; the other
+was reclassified as buildable once scoped narrowly:
+
+- **Web dashboard — built.** `webapp.py` is a small Flask app reusing the
+  exact same core-module functions as `cli.py`/`menu.py`/`gui.py`, binding
+  to `127.0.0.1` by default with a loud warning if you override `--host`
+  to anything else. The original objection ("adds a server/browser attack
+  surface for a tool that needs local root/USB access") is addressed by
+  making that surface localhost-only by construction, not by refusing to
+  build it.
+- **iOS support — still declined**, same reasoning as before: it isn't a
+  feature of this codebase, it's a different tool (usbmuxd/SSH instead of
+  ADB, a jailbreak-tool ecosystem instead of Magisk, a different cert
+  install mechanism). Building it here would mean either an untested
+  parallel codebase or a stub claiming support that doesn't exist.
+- **Cloud/remote device farms — still declined**: no provider was named
+  (AWS Device Farm, Firebase Test Lab, Genymotion Cloud, Corellium all have
+  different APIs) and none are configured in this environment, so anything
+  built here would be unvalidatable against a real account.
+
+### Phase 8 — Multi-device fan-out
+`adb.resolve_devices()` (plural) added alongside the existing
+`resolve_device()`: `--device all` now runs a command against every
+connected, rooted device sequentially (not concurrently, to avoid workdir
+races), skipping any device that fails the root check rather than aborting
+the whole run. `cli.py`'s `cert`/`frida-server`/`frida-check`/`apps`/`all`
+commands were rewritten around a shared `_require_devices()` helper.
+`menu.py`/`gui.py` stay single-device — fan-out is a scripting/CI need, not
+an interactive-menu one.
+
+Fixed a real bug found while doing this: `AdbError` was never caught
+anywhere in `cli.py`, so "no device" or "multiple devices" used to
+propagate as a raw Python traceback instead of a clean message — and its
+text embeds a Python list repr (`"['a', 'b']"`), which can break Rich's
+markup parser if interpolated into a colored string unescaped. Both are
+fixed (`_require_devices` catches `AdbError`, `rich.markup.escape()` wraps
+interpolated exception/list text) and covered by `tests/test_cli.py`.
+
+### Phase 9 — Config wizard
+`pen-andro init` prompts for Burp host/port, detects connected devices to
+suggest a `device_serial` default, and writes `config.yaml` — replacing
+hand-editing `config.example.yaml`.
+
+### Phase 10 — Web dashboard
+`pen_andro/webapp.py` (Flask, `pip install -e ".[web]"`). One background
+worker thread at a time (concurrent adb/root operations against the same
+workdir would race, same reasoning as fan-out being sequential); the page
+polls `/api/log`, mirroring the queue-draining pattern `gui.py` already
+uses for Tkinter. Log output is HTML-escaped before being sent to the
+browser.
+
+### Phase 11 — PyInstaller packaging
+`scripts/pyinstaller_entry.py` + `.github/workflows/build.yml`, triggered
+on `v*` tags or manually. This was actually built and run during
+development, not just written and assumed to work: the first attempt
+failed (`ModuleNotFoundError: No module named 'pen_andro'`) because
+PyInstaller's static analysis doesn't follow the import hooks modern
+`pip install -e .` editable installs use — fixed with an explicit
+`--paths` flag pointing at the source tree, verified by actually running
+the built binary's `--help`. Packages the CLI only; the Tkinter GUI and
+Flask web dashboard aren't bundled (different packaging story for each,
+not worth the added CI complexity for this round).
+
+### Phase 12 — Device-integration test scaffolding
+`tests/conftest.py`'s `real_device_serial` fixture and
+`tests/test_device_integration.py`, gated behind
+`PEN_ANDRO_RUN_DEVICE_TESTS=1` and a real connected device — skipped by
+default so `pytest` stays hermetic. Deliberately read-only (root/arch/
+connectivity checks only, no installs) so it's safe to run repeatedly
+against a real test device.
+
+### Phase 13 — CONTRIBUTING.md
+Dev setup, check commands, and a pointer to `CLAUDE.md`/`PHASES.md` for
+anyone opening a PR.

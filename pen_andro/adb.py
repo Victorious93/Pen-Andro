@@ -34,11 +34,13 @@ def list_devices() -> list[Device]:
     return devices
 
 
-def resolve_device(serial: str | None = None) -> Device:
-    """Pick the device to operate on.
+def resolve_devices(serial: str | None = None) -> list[Device]:
+    """Resolve which device(s) to operate on.
 
-    Raises AdbError if none are connected, if a requested serial isn't
-    present, or if more than one is connected and no serial was given.
+    - serial == "all": every online device (fan-out).
+    - serial == "<specific serial>": that device only, if connected.
+    - serial is None: the single online device, or an error if zero or
+      more than one are connected (ambiguous without --device all).
     """
     online = [d for d in list_devices() if d.state == "device"]
     if not online:
@@ -46,10 +48,12 @@ def resolve_device(serial: str | None = None) -> Device:
             "No ADB device found. Connect a rooted device/emulator with USB "
             "debugging enabled and authorized for this computer."
         )
+    if serial == "all":
+        return online
     if serial:
         for device in online:
             if device.serial == serial:
-                return device
+                return [device]
         raise AdbError(
             f"Device '{serial}' not found among connected devices: "
             f"{[d.serial for d in online]}"
@@ -57,10 +61,26 @@ def resolve_device(serial: str | None = None) -> Device:
     if len(online) > 1:
         raise AdbError(
             "Multiple devices connected: "
-            f"{[d.serial for d in online]}. Pass --device <serial> or set "
-            "device_serial in config.yaml to pick one."
+            f"{[d.serial for d in online]}. Pass --device <serial> to pick "
+            "one, or --device all to run against every connected device."
         )
-    return online[0]
+    return online
+
+
+def resolve_device(serial: str | None = None) -> Device:
+    """Pick a single device to operate on.
+
+    Raises AdbError if none are connected, if a requested serial isn't
+    present, or if more than one is connected and no serial (or "all")
+    disambiguates it.
+    """
+    devices = resolve_devices(serial)
+    if len(devices) > 1:
+        raise AdbError(
+            "This action only supports one device at a time; pass "
+            "--device <serial> to pick one."
+        )
+    return devices[0]
 
 
 def adb(serial: str, *args: str, timeout: int = 30):

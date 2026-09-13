@@ -56,6 +56,29 @@ def test_resolve_device_raises_when_none_connected(monkeypatch):
         adb.resolve_device()
 
 
+def test_resolve_devices_all_returns_every_online_device(monkeypatch):
+    monkeypatch.setattr(
+        adb,
+        "list_devices",
+        lambda: [adb.Device("a", "device"), adb.Device("b", "device"), adb.Device("c", "offline")],
+    )
+    devices = adb.resolve_devices("all")
+    assert [d.serial for d in devices] == ["a", "b"]
+
+
+def test_resolve_devices_all_with_single_device(monkeypatch):
+    monkeypatch.setattr(adb, "list_devices", lambda: [adb.Device("a", "device")])
+    assert [d.serial for d in adb.resolve_devices("all")] == ["a"]
+
+
+def test_resolve_device_rejects_all_when_multiple_connected(monkeypatch):
+    monkeypatch.setattr(
+        adb, "list_devices", lambda: [adb.Device("a", "device"), adb.Device("b", "device")]
+    )
+    with pytest.raises(adb.AdbError):
+        adb.resolve_device("all")
+
+
 def test_check_root_true_when_su_succeeds(monkeypatch):
     monkeypatch.setattr(adb, "shell", lambda serial, cmd, **kw: CommandResult(0, "ok\n", ""))
     assert adb.check_root("serial") is True

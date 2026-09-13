@@ -3,6 +3,8 @@ original script, rebuilt on top of the Phase 2 modules instead of
 duplicating their logic."""
 from __future__ import annotations
 
+from rich.markup import escape
+
 from . import adb as adb_mod
 from . import android_apps, frida_tools, network, pc_tools
 from . import burp as burp_mod
@@ -50,7 +52,7 @@ def _run_all(cfg: Config, console):
             name = burp_mod.install_certificate(serial, cfg.burp.host, cfg.burp.port, cfg.workdir)
             console.print(f"[green]Certificate installed: {name}[/]")
         except burp_mod.BurpError as exc:
-            console.print(f"[yellow]{exc}[/]")
+            console.print(f"[yellow]{escape(str(exc))}[/]")
     else:
         console.print(f"[yellow]Skipping certificate: Burp not reachable at {cfg.burp.host}:{cfg.burp.port}[/]")
     console.print("[bold green]Done. Reboot the device to apply all changes.[/]")
@@ -134,4 +136,4 @@ def interactive_menu(cfg: Config, console):
         except SystemExit:
             continue
         except Exception as exc:  # keep the menu alive on a single failed action
-            console.print(f"[red]Error: {exc}[/]")
+            console.print(f"[red]Error: {escape(str(exc))}[/]")
