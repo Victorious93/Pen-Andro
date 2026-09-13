@@ -1,0 +1,15 @@
+services:
+  pen-andro:
+    build: .
+    image: pen-andro:latest
+    # host networking so `adb connect` and Burp on 127.0.0.1 are reachable;
+    # only works as-is on Linux hosts.
+    network_mode: host
+    volumes:
+      - ./config.yaml:/opt/pen-andro/config.yaml:ro
+      - pen-andro-workdir:/tmp/pen_andro
+    stdin_open: true
+    tty: true
+
+volumes:
+  pen-andro-workdir:

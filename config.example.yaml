@@ -1,0 +1,19 @@
+# Copy to config.yaml and edit, or override any value with an environment
+# variable (PEN_ANDRO_BURP_HOST, PEN_ANDRO_BURP_PORT, PEN_ANDRO_DEVICE).
+burp:
+  host: 127.0.0.1
+  port: 8080
+
+# Leave null to auto-detect when exactly one device is connected via adb.
+device_serial: null
+
+# Prefer installing Frida as a Magisk module (persists across reboots) over
+# pushing a manual frida-server binary to /system/xbin, when Magisk is
+# available on the device.
+prefer_magisk: true
+
+# Scratch directory for downloaded certs/binaries/APKs.
+workdir: /tmp/pen_andro
+
+# Pin a specific Frida version instead of always resolving "latest".
+pinned_frida_version: null
