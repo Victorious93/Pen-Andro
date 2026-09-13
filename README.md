@@ -1,67 +1,136 @@
 # Pen-Andro
 
-  [![HitCount](https://hits.dwyl.com/raoshaab/raoshaab/Pen-Andro.svg?style=flat-square)](http://hits.dwyl.com/raoshaab/raoshaab/Pen-Andro)
+[![CI](https://github.com/raoshaab/Pen-Andro/actions/workflows/ci.yml/badge.svg)](https://github.com/raoshaab/Pen-Andro/actions/workflows/ci.yml)
+[![HitCount](https://hits.dwyl.com/raoshaab/raoshaab/Pen-Andro.svg?style=flat-square)](http://hits.dwyl.com/raoshaab/raoshaab/Pen-Andro)
 
- 
 ![](./assets/animation.gif)
 
+## 💥 Introduction
 
-## 💥 Introduction 
-This Script will automate the process of installing all necessary tools & tasks for Android Pentesting i.e Moving Burpsuite Certificate ,Installing Adb frida server, APKs like proxy toggle, proxydroid, adbwifi.  
+Pen-Andro automates the repetitive setup work for Android penetration
+testing: installing the Burp Suite CA certificate onto a rooted device,
+installing Frida server (matched to the device's CPU and, when Magisk is
+present, persisted across reboots), and installing helper apps
+(ProxyToggle, ProxyDroid, ADB WiFi) and PC-side tools (JADX, apktool,
+scrcpy, Frida, objection).
 
+It ships as a Python package with a CLI, an interactive terminal menu, and
+an optional GUI — the original Bash script is kept under `legacy/` for
+reference but is no longer maintained.
 
-## 🛠️ Usage
+## 🛠️ Installation
 
-1. Open Terminal  
-2. Run below command
-
+```console
+git clone https://github.com/raoshaab/Pen-Andro.git
+cd Pen-Andro
+pip install -e .
 ```
-curl -sL https://tinyurl.com/pen-Android | sudo bash 
 
+> **Security note:** earlier versions of this README recommended
+> `curl -sL <shortlink> | sudo bash` — running a script fetched from a URL
+> shortener directly as root, with no way to review it first or verify its
+> integrity. That pattern is a real supply-chain risk and has been dropped.
+> Clone the repo, read `pen_andro/`, then install it.
+
+Optional extras:
+
+```console
+pip install -e ".[dev]"     # pytest, ruff — for running tests/lint
 ```
+
+The GUI (`pen-andro-gui`) uses Tkinter, which ships with most Python
+installs; on some minimal Linux distros you may need `apt install
+python3-tk` first.
+
+### Docker (PC-tools only)
+
+```console
+docker compose build
+docker compose run --rm pen-andro doctor
+```
+
+This container provides jadx/apktool/scrcpy/frida/objection/adb, **not**
+the on-device Magisk workflow — see the comment at the top of `Dockerfile`
+for what does and doesn't work from inside a container.
 
 ## Preconditions
 
-* Burpsuite proxy Running at 127.0.0.1:8080
-* Rooted Android device connected via adb (Only one device should be connected)
-* Magisk App  (It will make installation easy ) 
-1. For Android Virtual device (https://github.com/newbit1/rootAVD)
-2. For Genymotion emulator [Blog Link](https://support.genymotion.com/hc/en-us/articles/360011385178-How-to-install-Xposed-or-Magisk-Edxposed-with-Genymotion-Device-image-PaaS-)
+* Burp Suite's proxy running (default `127.0.0.1:8080`; configurable, see below)
+* A rooted Android device or emulator connected via `adb`, with root access
+  granted to `adb` from the on-device superuser manager
+* [Magisk](https://github.com/topjohnwu/Magisk) installed (recommended —
+  lets Pen-Andro install Frida as a module that survives reboots instead of
+  pushing a binary that doesn't)
+  1. For an Android Virtual Device: https://github.com/newbit1/rootAVD
+  2. For Genymotion: https://support.genymotion.com/hc/en-us/articles/360011385178
 
+## Configuration
 
-### I want to Install  :- 
+Copy `config.example.yaml` to `config.yaml` and edit, or override any value
+with an environment variable:
 
-```console
-
-curl -sL https://tinyurl.com/pen-Android | sudo bash 
-
-            mmmmm                         mm              #          mmmm
-            #   "#  mmm   m mm            ##   m mm    mmm#   m mm  m"  "m
-            #mmm#" #"  #  #"  #          #  #  #"  #  #" "#   #"  " #  m #
-            #      #""""  #   #   """    #mm#  #   #  #   #   #     #    #
-            #      "#mm"  #   #         #    # #   #  "#m##   #      #mm#
-
-
-            #Author: github.com/@raoshaab
-
-
-1. All
-2. Move Burpsuite Certificate to Android root folder
-3. Pc Tools (JADX, frida, objection, Android Screen Control & Mirror
-4. Android Frida Server
-5. Fix Frida Server Version mismatch
-6. Android Apps(proxytoogle, proxydroid, ADBwifi)
-0. Exit
-
-I want to install  :-
+```yaml
+burp:
+  host: 127.0.0.1
+  port: 8080
+device_serial: null      # set this (or use --device) when multiple devices are connected
+prefer_magisk: true
+workdir: /tmp/pen_andro
+pinned_frida_version: null
 ```
 
-## Screenshots 
+| Environment variable      | Overrides           |
+|----------------------------|----------------------|
+| `PEN_ANDRO_BURP_HOST`      | `burp.host`          |
+| `PEN_ANDRO_BURP_PORT`      | `burp.port`          |
+| `PEN_ANDRO_DEVICE`         | `device_serial`      |
+
+## 🛠️ Usage
+
+Run with no arguments for the classic interactive menu:
+
+```console
+pen-andro
+```
+
+```
+1. All
+2. Move Burp Suite certificate to the device
+3. PC tools (jadx, apktool, scrcpy, frida, objection)
+4. Android Frida server
+5. Check/fix Frida version mismatch
+6. Android apps (ProxyToggle, ProxyDroid, ADB WiFi)
+0. Exit
+```
+
+Or drive it as a normal CLI (useful in scripts/CI):
+
+```console
+pen-andro doctor                  # check internet, Burp, adb, root
+pen-andro cert [--force]          # install the Burp CA certificate
+pen-andro pc-tools                # install jadx, apktool, scrcpy, frida, objection
+pen-andro frida-server [--force]  # install/upgrade frida-server on the device
+pen-andro frida-check             # compare latest/PC/device Frida versions
+pen-andro apps                    # install ProxyToggle, ProxyDroid, ADB WiFi
+pen-andro all [--force-frida]     # run everything above
+```
+
+Every command accepts `--device <serial>` (when more than one device is
+connected) and `--config <path>`.
+
+Or launch the GUI:
+
+```console
+pen-andro-gui
+```
+
+## Screenshots
+
 <img src="./assets/screen.gif" />
 
 ## 🛠️ Features
 
-### Android Apps 
+### Android Apps
 * Proxy droid
 
  <img src="./assets/proxy_droid.png" width="64" align="center"/>
@@ -74,37 +143,57 @@ I want to install  :-
 
 <img src="./assets/proxy_toggle.png" width="64" align="center"/>
 
-### Pc Tools 
-* Frida, objection & Frida-Server for Android
-<img src="./assets/frida.svg"  width="81" align="center" />
+### PC Tools
+* Frida, objection & Frida server for Android
 
-* jDax-gui 
+<img src="./assets/frida.svg" width="81" align="center" />
 
-<img src="./assets/jadx-logo.png"  width="64" align="center" />
+* JADX GUI
 
+<img src="./assets/jadx-logo.png" width="64" align="center" />
 
-* scrcpy 
+* scrcpy
 
 <img src="./assets/scrcpy.svg" alt="scrcpy" align="center" width="60" />
 
-* Burpsuite Certificate install
+* Burp Suite certificate install
 
 <img src="./assets/burpsuite-logo.svg" alt="scrcpy" align="center" width="64" />
 
+## Development
 
-## FAQs :
-* Burpsuite Error :-  Check Proxy tab of Burpsuite at set the proxy as 127.0.0.1 with port 8080
-* Root access Error :-  Check If your device is Rooted or not (If not confirmed check 
-* Traffic not intercepting :- Reboot the device after Certificate installtion 
-* One or more devices conncted :- check with ```adb devices``` or try ```adb kill-server```(to remove offline devices)
+```console
+pip install -e ".[dev]"
+ruff check pen_andro tests
+pytest --cov=pen_andro
+```
 
+See `PHASES.md` for the architecture rationale and `CLAUDE.md` for
+guidance aimed at AI coding agents working in this repo.
 
-## Credits :
+## FAQs
 
-1. skylot  https://github.com/skylot/jadx
-2. frida https://github.com/frida/frida
-3. Madeye https://github.com/madeye/proxydroid
-4. Sujan Poudel https://github.com/psuzn/ADB-WiFi
-5. Voicu Klein,Fidel Montesino https://github.com/theappbusiness/android-proxy-toggle]
-6. Genymobile https://github.com/Genymobile/scrcpy
+* **Burp error** — check the Proxy tab of Burp Suite and confirm the
+  listener matches your `config.yaml` (`127.0.0.1:8080` by default).
+* **Root access error** — confirm your device is rooted and that `adb` has
+  been granted root by the on-device superuser manager.
+* **Traffic not intercepting** — reboot the device after certificate
+  installation.
+* **"Multiple devices connected"** — pass `--device <serial>` (or set
+  `device_serial` in `config.yaml`); run `adb devices` to see serials, or
+  `adb kill-server` to clear stale offline entries.
 
+## Credits
+
+1. skylot — https://github.com/skylot/jadx
+2. frida — https://github.com/frida/frida
+3. Madeye — https://github.com/madeye/proxydroid
+4. Sujan Poudel — https://github.com/psuzn/ADB-WiFi
+5. Voicu Klein, Fidel Montesino — https://github.com/theappbusiness/android-proxy-toggle
+6. Genymobile — https://github.com/Genymobile/scrcpy
+7. ViRb3 — https://github.com/ViRb3/magisk-frida
+8. NVISOsecurity — https://github.com/NVISOsecurity/MagiskTrustUserCerts
+
+## License
+
+GPL-3.0-or-later — see `LICENSE`.
