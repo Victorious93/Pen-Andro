@@ -1,0 +1,27 @@
+name: Build standalone binary
+
+# Builds a self-contained pen-andro CLI binary (no Python install needed at
+# the target) for a tagged release or on demand. This packages the CLI
+# only — see CONTRIBUTING.md for why the GUI/web dashboard aren't bundled.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[build]"
+      # --paths is required: pen_andro is installed editable, and PyInstaller's
+      # static analysis doesn't follow modern editable-install import hooks
+      # without being told where the real source tree is.
+      - run: pyinstaller --onefile --name pen-andro --paths "$PWD" scripts/pyinstaller_entry.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pen-andro-linux-x86_64
+          path: dist/pen-andro

@@ -18,11 +18,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.4", "pytest-cov>=4.1", "ruff>=0.4"]
+dev = ["pytest>=7.4", "pytest-cov>=4.1", "ruff>=0.4", "flask>=3.0"]
+web = ["flask>=3.0"]
+build = ["pyinstaller>=6.0"]
 
 [project.scripts]
 pen-andro = "pen_andro.cli:main"
 pen-andro-gui = "pen_andro.gui:main"
+pen-andro-web = "pen_andro.webapp:main"
 
 [tool.setuptools.packages.find]
 include = ["pen_andro*"]
@@ -35,3 +38,7 @@ select = ["E", "F", "I", "UP"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["device: requires a real, rooted ADB device (opt-in; see tests/conftest.py)"]
+# Excludes `device`-marked tests by default; `pytest -m device` overrides
+# this (the last -m wins), which is how they're meant to be run.
+addopts = "-m 'not device'"

@@ -14,9 +14,10 @@ present, persisted across reboots), and installing helper apps
 (ProxyToggle, ProxyDroid, ADB WiFi) and PC-side tools (JADX, apktool,
 scrcpy, Frida, objection).
 
-It ships as a Python package with a CLI, an interactive terminal menu, and
-an optional GUI — the original Bash script is kept under `legacy/` for
-reference but is no longer maintained.
+It ships as a Python package with a CLI, an interactive terminal menu, an
+optional Tkinter GUI, and an optional local web dashboard — the original
+Bash script is kept under `legacy/` for reference but is no longer
+maintained.
 
 ## 🛠️ Installation
 
@@ -35,12 +36,28 @@ pip install -e .
 Optional extras:
 
 ```console
-pip install -e ".[dev]"     # pytest, ruff — for running tests/lint
+pip install -e ".[dev]"     # pytest, ruff, flask — for running tests/lint
+pip install -e ".[web]"     # flask only — for the web dashboard (pen-andro-web)
+pip install -e ".[build]"   # pyinstaller only — for packaging a standalone binary
 ```
 
 The GUI (`pen-andro-gui`) uses Tkinter, which ships with most Python
 installs; on some minimal Linux distros you may need `apt install
 python3-tk` first.
+
+### Standalone binary
+
+```console
+pip install -e ".[build]"
+pyinstaller --onefile --name pen-andro --paths "$PWD" scripts/pyinstaller_entry.py
+./dist/pen-andro --help
+```
+
+`--paths` is required — PyInstaller's static analysis doesn't follow the
+import hooks a `pip install -e .` editable install uses, so without it the
+build fails with `ModuleNotFoundError: No module named 'pen_andro'`.
+Packages the CLI only (not the GUI or web dashboard). A GitHub Actions job
+(`.github/workflows/build.yml`) builds this automatically on `v*` tags.
 
 ### Docker (PC-tools only)
 
@@ -106,7 +123,8 @@ pen-andro
 Or drive it as a normal CLI (useful in scripts/CI):
 
 ```console
-pen-andro doctor                  # check internet, Burp, adb, root
+pen-andro init                    # interactive config.yaml wizard
+pen-andro doctor                  # check internet, Burp, adb, root (per device)
 pen-andro cert [--force]          # install the Burp CA certificate
 pen-andro pc-tools                # install jadx, apktool, scrcpy, frida, objection
 pen-andro frida-server [--force]  # install/upgrade frida-server on the device
@@ -115,13 +133,29 @@ pen-andro apps                    # install ProxyToggle, ProxyDroid, ADB WiFi
 pen-andro all [--force-frida]     # run everything above
 ```
 
-Every command accepts `--device <serial>` (when more than one device is
-connected) and `--config <path>`.
+Every device-bound command accepts `--device <serial>` and `--config
+<path>`. Pass `--device all` to run against every connected, rooted device
+in one go (sequentially, so downloads to the shared workdir don't race);
+devices that fail the root check are skipped with a warning rather than
+aborting the whole run:
+
+```console
+pen-andro --device all frida-server
+```
 
 Or launch the GUI:
 
 ```console
 pen-andro-gui
+```
+
+Or the web dashboard (binds to `127.0.0.1:8765` by default — it grants the
+same root/USB device control as the CLI, so treat `--host` like you would
+any other local-admin tool):
+
+```console
+pip install -e ".[web]"
+pen-andro-web
 ```
 
 ## Screenshots
@@ -166,10 +200,13 @@ pen-andro-gui
 pip install -e ".[dev]"
 ruff check pen_andro tests
 pytest --cov=pen_andro
+PEN_ANDRO_RUN_DEVICE_TESTS=1 pytest -m device   # opt-in, needs a real rooted device
 ```
 
-See `PHASES.md` for the architecture rationale and `CLAUDE.md` for
-guidance aimed at AI coding agents working in this repo.
+See `CONTRIBUTING.md` for the full dev workflow, `PHASES.md` for the
+architecture rationale (including what was deliberately left out and why),
+and `CLAUDE.md` for guidance aimed at AI coding agents working in this
+repo.
 
 ## FAQs
 
@@ -179,9 +216,17 @@ guidance aimed at AI coding agents working in this repo.
   been granted root by the on-device superuser manager.
 * **Traffic not intercepting** — reboot the device after certificate
   installation.
-* **"Multiple devices connected"** — pass `--device <serial>` (or set
-  `device_serial` in `config.yaml`); run `adb devices` to see serials, or
-  `adb kill-server` to clear stale offline entries.
+* **"Multiple devices connected"** — pass `--device <serial>` or `--device
+  all` (or set `device_serial` in `config.yaml`); run `adb devices` to see
+  serials, or `adb kill-server` to clear stale offline entries.
+
+## Not supported
+
+iOS and cloud/remote device farms are deliberately not implemented — see
+"Round 2" in `PHASES.md` for why. Both would need a fundamentally
+different device-communication layer than the ADB/root/Magisk model this
+tool is built around; adding either here would mean a parallel,
+undertested codebase rather than a feature of this one.
 
 ## Credits
 

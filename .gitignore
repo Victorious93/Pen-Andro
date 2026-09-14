@@ -10,3 +10,4 @@ htmlcov/
 config.yaml
 venv/
 .venv/
+*.spec
